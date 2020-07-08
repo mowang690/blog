@@ -2,7 +2,7 @@
 <search>
   <entry>
     <title>OAUTH2客户端</title>
-    <url>/2020/07/08/OAUTH2%E5%AE%A2%E6%88%B7%E7%AB%AF/</url>
+    <url>/blog/2020/07/08/OAUTH2%E5%AE%A2%E6%88%B7%E7%AB%AF/</url>
     <content><![CDATA[<pre><code>package com.jsict.biz.controller;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -173,7 +173,7 @@ public class ClientController {
   </entry>
   <entry>
     <title>win10上的快捷键</title>
-    <url>/2020/07/08/win10%E4%B8%8A%E7%9A%84%E5%BF%AB%E6%8D%B7%E9%94%AE/</url>
+    <url>/blog/2020/07/08/win10%E4%B8%8A%E7%9A%84%E5%BF%AB%E6%8D%B7%E9%94%AE/</url>
     <content><![CDATA[<h1 id="win10上的快捷键"><a href="#win10上的快捷键" class="headerlink" title="win10上的快捷键"></a>win10上的快捷键</h1>   <font size=4>
 
 <pre><code>win+e:打开资源管理器
