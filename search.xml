@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title>OAUTH2客户端</title>
+    <url>/2020/07/08/OAUTH2%E5%AE%A2%E6%88%B7%E7%AB%AF/</url>
+    <content><![CDATA[<pre><code>package com.jsict.biz.controller;
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import com.jsict.biz.model.Module;
+import com.jsict.biz.model.User;
+import com.jsict.biz.service.ModuleService;
+import com.jsict.biz.service.UserService;
+import org.apache.oltu.oauth2.client.OAuthClient;
+import org.apache.oltu.oauth2.client.URLConnectionClient;
+import org.apache.oltu.oauth2.client.request.OAuthBearerClientRequest;
+import org.apache.oltu.oauth2.client.request.OAuthClientRequest;
+import org.apache.oltu.oauth2.client.response.OAuthAccessTokenResponse;
+import org.apache.oltu.oauth2.client.response.OAuthResourceResponse;
+import org.apache.oltu.oauth2.common.OAuth;
+import org.apache.oltu.oauth2.common.exception.OAuthProblemException;
+import org.apache.oltu.oauth2.common.exception.OAuthSystemException;
+import org.apache.oltu.oauth2.common.message.types.GrantType;
+import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.authc.UsernamePasswordToken;
+import org.apache.shiro.subject.Subject;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.ModelAndView;
+
+import java.util.List;
+
+
+@RequestMapping(&quot;/client&quot;)
+@Controller
+public class ClientController {
+    String clientId = null;
+    String clientSecret = null;
+    String accessTokenUrl = null;
+    String userInfoUrl = null;
+    String redirectUrl = null;
+    String response_type = null;
+    String code= null;
+
+    @Resource
+    private ModuleService moduleService;
+
+    //1、客户端向服务端请求Code。参数必须带有在服务数据库中有记录的clientId,回调路径redirectUrl,以及其他参数。
+    @RequestMapping(&quot;/getCode&quot;)
+    public String getCode(HttpServletRequest request, HttpServletResponse response){
+        clientId = &quot;udp&quot;;
+        clientSecret = &quot;5R3%3r@4TY5#1ft&quot;;
+        //服务器部分controller的名称
+        accessTokenUrl = &quot;getCode&quot;;
+        //服务器回调客户端的路径
+        redirectUrl = &quot;http://localhost:8080/udp/client/getAccessToken&quot;;
+        response_type = &quot;code&quot;;
+        OAuthClient oAuthClient =new OAuthClient(new URLConnectionClient());
+        String requestUrl = null;
+
+        try {
+
+            //构建oauthd的请求。设置请求服务地址（accessTokenUrl）、clientId、response_type、redirectUrl
+            OAuthClientRequest accessTokenRequest = OAuthClientRequest.authorizationLocation(accessTokenUrl)
+                    .setResponseType(response_type)
+                    .setClientId(clientId)
+                    .setRedirectURI(redirectUrl)
+                    .buildQueryMessage();
+            requestUrl = accessTokenRequest.getLocationUri();
+
+            System.out.println(&quot;发送给OAuth服务器部分路径:&quot;+requestUrl);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        //向服务器进行请求
+        return &quot;redirect:http://localhost:8081/uuap/&quot;+requestUrl ;
+
+    }
+    @RequestMapping(&quot;/error&quot;)
+    public String error(){
+
+        return &quot;error&quot;;
+    }
+    //2、客户端的回调中接收服务端产生的Code,继续向服务端请求资源授权AccessToken。
+    @RequestMapping(&quot;/getAccessToken&quot;)
+    public String getAccessToken(HttpServletRequest request){
+        clientId = &quot;udp&quot;;
+        clientSecret = &quot;5R3%3r@4TY5#1ft&quot;;
+        accessTokenUrl=&quot;http://localhost:8081/uuap/accessToken&quot;;
+
+        redirectUrl = &quot;http://localhost:8080/udp/client/getResouce&quot;;
+        HttpServletRequest httpRequest = (HttpServletRequest)request;
+        code = httpRequest.getParameter(&quot;code&quot;);
+        System.out.println(&quot;收到服务器传递过来的code:&quot;+code);
+        OAuthClient oAuthClient =new OAuthClient(new URLConnectionClient());
+        try {
+            OAuthClientRequest accessTokenRequest = OAuthClientRequest
+                    .tokenLocation(accessTokenUrl)
+                    .setGrantType(GrantType.AUTHORIZATION_CODE)
+                    .setClientId(clientId)
+                    .setClientSecret(clientSecret)
+                    .setCode(code)
+                    .setRedirectURI(redirectUrl)
+                    .buildQueryMessage();
+            //去服务端请求access token，并返回响应
+            System.out.println(&quot;访问服务器路径:&quot;+accessTokenRequest.getLocationUri());
+            OAuthAccessTokenResponse oAuthResponse =oAuthClient.accessToken(accessTokenRequest, OAuth.HttpMethod.POST);
+            System.out.println(oAuthResponse);
+            //获取服务端返回过来的access token
+            String accessToken = oAuthResponse.getAccessToken();
+            //查看access token是否过期
+            Long expiresIn =oAuthResponse.getExpiresIn();
+            System.out.println(&quot;客户端得到服务器部分产生的token：：：&quot;+accessToken);
+            return&quot;redirect:http://localhost:8080/udp/client/getResouce?accessToken=&quot;+accessToken;
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+        }
+
+        return null;
+
+    }
+
+    @Resource
+    private UserService userService;
+
+    //3、客户端得到资源授权后，再去请求对应的资源。
+    @RequestMapping(&quot;/getResouce&quot;)
+    public ModelAndView getResouce(String accessToken){
+        System.out.println(&quot;客户端收到的访问令牌:&quot;+accessToken);
+        //查询服务器用户信息的controller
+
+        userInfoUrl = &quot;http://localhost:8081/uuap/userInfo&quot;;
+        //构建oauth
+        OAuthClient oAuthClient =new OAuthClient(new URLConnectionClient());
+        OAuthClientRequest userInfoRequest;
+        try {
+            userInfoRequest = new OAuthBearerClientRequest(userInfoUrl)
+                    .setAccessToken(accessToken).buildQueryMessage();
+            OAuthResourceResponse resourceResponse =oAuthClient
+                    .resource(userInfoRequest, OAuth.HttpMethod.GET, OAuthResourceResponse.class);
+
+            String username = resourceResponse.getBody();
+            System.out.println(&quot;获取的用户信息:&quot;+username);
+
+            ModelAndView mav = new ModelAndView(&quot;home&quot;);
+            User user=new User();
+            user.setDelFlag(0);
+            user.setUserId(username);
+            user=userService.singleResult(user);
+            Subject currentUser = SecurityUtils.getSubject();
+            currentUser.login(new UsernamePasswordToken(user.getUserId(), user.getPassword()));
+
+            User user1 = (User) SecurityUtils.getSubject().getPrincipal();
+            List&lt;Module&gt; modulelist=moduleService.getModuleFullTreeByUser(user1.isAdmin(),user1.getRoleList(),null);
+            mav.addObject(&quot;modulelist&quot;, modulelist);
+            return mav;
+        } catch (OAuthSystemException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (OAuthProblemException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+}
+</code></pre>]]></content>
+  </entry>
+  <entry>
+    <title>电脑上的快捷键</title>
+    <url>/2020/07/08/%E7%94%B5%E8%84%91%E4%B8%8A%E7%9A%84%E5%BF%AB%E6%8D%B7%E9%94%AE/</url>
+    <content><![CDATA[<h1 id="电脑上的快捷键"><a href="#电脑上的快捷键" class="headerlink" title="电脑上的快捷键"></a>电脑上的快捷键</h1>   <font size=4>
+
+<pre><code>win+e:打开资源管理器
+
+win+d:显示桌面
+
+win+r:运行对话框
+
+win+数字:访问任务栏应用程序
+
+win+x:呼出多种设置
+
+win+i:打开设置
+
+win+L:锁定屏幕
+
+win+s:呼出搜索
+
+win+tab:打开任务视图
+
+win+ctrl+d:创建新桌面
+
+win+ctrl+f4:关闭当前桌面
+
+win+ctrl+方向键:快速切换桌面
+
+win+方向键:改变窗口大小
+
+ctrl+shift+esc:任务管理器
+
+chrome中：
+
+ctrl+w:关闭标签
+
+ctrl+t:新建标签
+
+ctrl+shirt+t:恢复关闭的标签
+
+ctrl+h:历史记录
+
+ctrl+j:下载列表
+
+ctrl+f:页面查找
+
+ctrl+tab:切换标签
+
+ctrl+shirt+tab:切换到上一个标签
+
+ctrl+r:刷新
+
+ctrl+数字:切换到具体标签
+
+alt+d:输入定位到地址栏
+
+alt+f4:关闭应用程序</code></pre></font>
+]]></content>
+  </entry>
+</search>
